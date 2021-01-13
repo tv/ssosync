@@ -107,6 +107,8 @@ Usage:
 
 Flags:
   -t, --access-token string         SCIM Access Token
+      --approve-groups strings      approves only these groups, completely overrides ignore list
+      --approve-users strings       approves only these users, completely overrides ignore list
   -d, --debug                       Enable verbose / debug logging
   -e, --endpoint string             SCIM Endpoint
   -u, --google-admin string         Google Admin Email

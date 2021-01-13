@@ -278,6 +278,15 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 }
 
 func (s *syncGSuite) ignoreUser(name string) bool {
+	if len(s.cfg.ApproveUsers) > 0 {
+		for _, u := range s.cfg.ApproveUsers {
+			if u == name {
+				return false
+			}
+		}
+		return true
+	}
+
 	for _, u := range s.cfg.IgnoreUsers {
 		if u == name {
 			return true
@@ -288,6 +297,15 @@ func (s *syncGSuite) ignoreUser(name string) bool {
 }
 
 func (s *syncGSuite) ignoreGroup(name string) bool {
+	if len(s.cfg.ApproveGroups) > 0 {
+		for _, g := range s.cfg.ApproveGroups {
+			if g == name {
+				return false
+			}
+		}
+		return true
+	}
+
 	for _, g := range s.cfg.IgnoreGroups {
 		if g == name {
 			return true
