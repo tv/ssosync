@@ -16,9 +16,10 @@ package internal
 
 import (
 	"context"
-	"strings"
 	"io/ioutil"
-    "regexp"
+	"os"
+	"regexp"
+	"strings"
 
 	"github.com/awslabs/ssosync/internal/aws"
 	"github.com/awslabs/ssosync/internal/config"
@@ -163,7 +164,7 @@ func (s *syncGSuite) SyncGroups() error {
 			continue
 		}
 
-		if ! s.allowGroup(g.Email) {
+		if !s.allowGroup(g.Email) {
 			continue
 		}
 
@@ -245,8 +246,9 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 	log.Info("Creating the Google and AWS Clients needed")
 
 	creds := []byte(cfg.GoogleCredentials)
+	isFile := len(os.Getenv("SSOSYNC_GOOGLE_CREDENTIALS_ENV")) == 0 || !cfg.IsLambda
 
-	if !cfg.IsLambda {
+	if isFile {
 		b, err := ioutil.ReadFile(cfg.GoogleCredentials)
 		if err != nil {
 			return err
