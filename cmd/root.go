@@ -53,6 +53,7 @@ Complete documentation is available at https://github.com/awslabs/ssosync`,
 
 		err := internal.DoSync(ctx, cfg)
 		if err != nil {
+			log.Warn("Sync failed with %w", err)
 			return err
 		}
 

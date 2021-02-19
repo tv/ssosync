@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -154,17 +155,23 @@ func (s *syncGSuite) SyncGroups() error {
 	log.Debug("get google groups")
 	googleGroups, err := s.google.GetGroups()
 	if err != nil {
-		return err
+		return fmt.Errorf("Getting google groups failed, %w", err)
 	}
 
 	correlatedGroups := make(map[string]*aws.Group)
 
 	for _, g := range googleGroups {
 		if s.ignoreGroup(g.Email) {
+			log.WithFields(log.Fields{
+				"group": g.Email,
+			}).Debug("Ignoring group")
 			continue
 		}
 
 		if !s.allowGroup(g.Email) {
+			log.WithFields(log.Fields{
+				"group": g.Email,
+			}).Debug("Not allowing group")
 			continue
 		}
 
@@ -189,7 +196,7 @@ func (s *syncGSuite) SyncGroups() error {
 			log.Info("Creating group in AWS")
 			newGroup, err := s.aws.CreateGroup(aws.NewGroup(g.Email))
 			if err != nil {
-				return err
+				return fmt.Errorf("Error creating AWS group '%v': %w", g.Email, err)
 			}
 			correlatedGroups[newGroup.DisplayName] = newGroup
 			group = newGroup
@@ -197,7 +204,7 @@ func (s *syncGSuite) SyncGroups() error {
 
 		groupMembers, err := s.google.GetGroupMembers(g)
 		if err != nil {
-			return err
+			return fmt.Errorf("Error getting group members from google '%v': %w", g.Email, err)
 		}
 
 		memberList := make(map[string]*admin.Member)
@@ -214,7 +221,12 @@ func (s *syncGSuite) SyncGroups() error {
 			log.WithField("user", u.Username).Debug("Checking user is in group already")
 			b, err := s.aws.IsUserInGroup(u, group)
 			if err != nil {
-				return err
+				return fmt.Errorf(
+					"Checking user in a group failed, user: '%v', group: '%v', %w",
+					u.Username,
+					group.DisplayName,
+					err,
+				)
 			}
 
 			if _, ok := memberList[u.Username]; ok {
@@ -222,7 +234,12 @@ func (s *syncGSuite) SyncGroups() error {
 					log.WithField("user", u.Username).Info("Adding user to group")
 					err := s.aws.AddUserToGroup(u, group)
 					if err != nil {
-						return err
+						return fmt.Errorf(
+							"Adding user in a group failed, user: '%v', group: '%v', %w",
+							u.Username,
+							group.DisplayName,
+							err,
+						)
 					}
 				}
 			} else {
@@ -230,7 +247,12 @@ func (s *syncGSuite) SyncGroups() error {
 					log.WithField("user", u.Username).Info("Removing user from group")
 					err := s.aws.RemoveUserFromGroup(u, group)
 					if err != nil {
-						return err
+						return fmt.Errorf(
+							"Removing user from a group failed, user: '%v', group: '%v', %w",
+							u.Username,
+							group.DisplayName,
+							err,
+						)
 					}
 				}
 			}
@@ -246,9 +268,9 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 	log.Info("Creating the Google and AWS Clients needed")
 
 	creds := []byte(cfg.GoogleCredentials)
-	isFile := len(os.Getenv("SSOSYNC_GOOGLE_CREDENTIALS_ENV")) == 0 || !cfg.IsLambda
+	isNotFile := len(os.Getenv("SSOSYNC_GOOGLE_CREDENTIALS_ENV")) > 0 || !cfg.IsLambda
 
-	if isFile {
+	if !isNotFile {
 		b, err := ioutil.ReadFile(cfg.GoogleCredentials)
 		if err != nil {
 			return err
@@ -279,12 +301,12 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 	c := New(cfg, awsClient, googleClient)
 	err = c.SyncUsers()
 	if err != nil {
-		return err
+		return fmt.Errorf("SyncUsers failed, %w", err)
 	}
 
 	err = c.SyncGroups()
 	if err != nil {
-		return err
+		return fmt.Errorf("SyncGroups failed, %w", err)
 	}
 
 	return nil
